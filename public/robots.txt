@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /account
+Disallow: /checkout
+Disallow: /cart
+Disallow: /auth
+Disallow: /admin
+Disallow: /admin/login
+
+Sitemap: https://hostinger-project-4f7-4b3a6c7-4c02netlify-app.lovable.app/sitemap.xml

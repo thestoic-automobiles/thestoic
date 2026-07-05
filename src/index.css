@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* The Stoic Automobiles — industrial automotive design system */
+
+@layer base {
+  :root {
+    --background: 36 24% 98%;
+    --foreground: 220 22% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 22% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 22% 10%;
+
+    /* Deep onyx as primary brand surface */
+    --primary: 220 22% 12%;
+    --primary-foreground: 36 30% 96%;
+
+    --secondary: 36 18% 94%;
+    --secondary-foreground: 220 22% 10%;
+
+    --muted: 36 14% 93%;
+    --muted-foreground: 220 8% 38%;
+
+    /* Refined copper-amber accent (premium, not neon) */
+    --accent: 28 78% 48%;
+    --accent-foreground: 36 30% 98%;
+
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 36 14% 86%;
+    --input: 36 14% 86%;
+    --ring: 28 78% 48%;
+
+    --radius: 0.25rem;
+
+    --charcoal: 220 22% 12%;
+    --charcoal-deep: 222 28% 7%;
+    --steel: 220 9% 52%;
+    --signal: 28 78% 48%;
+    --signal-deep: 24 72% 40%;
+
+    --sidebar-background: 222 28% 7%;
+    --sidebar-foreground: 36 30% 96%;
+    --sidebar-primary: 28 78% 48%;
+    --sidebar-primary-foreground: 36 30% 98%;
+    --sidebar-accent: 220 22% 14%;
+    --sidebar-accent-foreground: 36 30% 96%;
+    --sidebar-border: 220 22% 18%;
+    --sidebar-ring: 28 78% 48%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html, body {
+    @apply bg-background text-foreground;
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  body {
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+    -webkit-text-size-adjust: 100%;
+  }
+  img, video, svg { max-width: 100%; height: auto; }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Oswald', 'Manrope', sans-serif;
+    letter-spacing: -0.01em;
+    overflow-wrap: break-word;
+  }
+  #root { overflow-x: hidden; }
+}
+
+
+@layer utilities {
+  .font-display { font-family: 'Oswald', 'Manrope', sans-serif; }
+  .font-mono-tight { font-family: 'JetBrains Mono', ui-monospace, monospace; letter-spacing: -0.02em; }
+
+  .text-signal { color: hsl(var(--signal)); }
+  .bg-charcoal { background-color: hsl(var(--charcoal)); }
+  .bg-charcoal-deep { background-color: hsl(var(--charcoal-deep)); }
+
+  .industrial-grid {
+    background-image:
+      linear-gradient(hsl(var(--border)) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border)) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .diagonal-stripes {
+    background-image: repeating-linear-gradient(
+      135deg,
+      hsl(var(--signal)) 0,
+      hsl(var(--signal)) 8px,
+      hsl(var(--charcoal-deep)) 8px,
+      hsl(var(--charcoal-deep)) 16px
+    );
+  }
+
+  .hover-lift {
+    transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 32px -16px hsla(220, 22%, 8%, 0.25);
+    border-color: hsl(var(--signal));
+  }
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Hide Lovable badge */
+#lovable-badge,
+[id^="lovable-badge"],
+a[href*="lovable.dev"][target="_blank"],
+a[href*="lovable.app"][aria-label*="Lovable" i],
+a[aria-label*="Made with Lovable" i] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
