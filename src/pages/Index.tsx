@@ -33,39 +33,76 @@ const CAT_IMAGES: Record<string, string> = {
 
 const ICONS: Record<string, any> = { Cog, Disc, Filter, Lightbulb, Zap, Droplet, Car, MoveVertical };
 
-const BRAND_LOGOS = [
-  { name: "Maruti Suzuki", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Suzuki_logo_2.svg/320px-Suzuki_logo_2.svg.png" },
-  { name: "Hyundai", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Hyundai_Motor_Company_logo.svg/320px-Hyundai_Motor_Company_logo.svg.png" },
-  { name: "Tata Motors", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Tata_logo.svg/320px-Tata_logo.svg.png" },
-  { name: "Mahindra", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Mahindra_%26_Mahindra_Logo.svg/320px-Mahindra_%26_Mahindra_Logo.svg.png" },
-  { name: "Honda", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Honda_Logo.svg/320px-Honda_Logo.svg.png" },
-  { name: "Toyota", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Toyota_carlogo.svg/320px-Toyota_carlogo.svg.png" },
-  { name: "Kia", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/KIA_logo3.svg/320px-KIA_logo3.svg.png" },
-  { name: "Bajaj", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Bajaj_Auto.svg/320px-Bajaj_Auto.svg.png" },
-  { name: "Hero", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Hero_MotoCorp_Logo.svg/320px-Hero_MotoCorp_Logo.svg.png" },
-  { name: "TVS", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/TVS_Motor_Company_Logo.svg/320px-TVS_Motor_Company_Logo.svg.png" },
-  { name: "Yamaha", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Yamaha_Motor_Logo_%28blue%29.svg/320px-Yamaha_Motor_Logo_%28blue%29.svg.png" },
-  { name: "Royal Enfield", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Royal_Enfield_logo.svg/320px-Royal_Enfield_logo.svg.png" },
-];
+type Brand = {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  slug: string;
+};
 
 type Cat = { id: string; name: string; slug: string; icon: string | null; image_url: string | null };
 
 const Index = () => {
   const [cats, setCats] = useState<Cat[]>([]);
   const [featured, setFeatured] = useState<ProductCardData[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
 
   useEffect(() => {
     (async () => {
-      const [c, p] = await Promise.all([
-        supabase.from("part_categories").select("id,name,slug,icon,image_url").order("name"),
-        supabase.from("products").select("id,sku,name,price_inr,stock,image_url,mfg_year,brand:brands(name)").eq("is_active", true).eq("is_featured", true).order("created_at", { ascending: false }).limit(8),
+      const [c, p, b] = await Promise.all([
+        supabase
+          .from("part_categories")
+          .select("id,name,slug,icon,image_url")
+          .order("name"),
+
+        supabase
+          .from("products")
+          .select(`
+            id,
+            sku,
+            name,
+            price_inr,
+            stock,
+            image_url,
+            mfg_year,
+            brand:brands(name)
+          `)
+          .eq("is_active", true)
+          .eq("is_featured", true)
+          .order("created_at", { ascending: false })
+          .limit(8),
+
+        supabase
+          .from("brands")
+          .select("id,name,slug,logo_url")
+          .order("name")
       ]);
-      setCats((c.data as any) || []);
-      let feat = (p.data as any) || [];
+
+      setCats(c.data || []);
+      setBrands(b.data || []);
+
+      let feat = p.data || [];
+
       if (feat.length === 0) {
-        const fb = await supabase.from("products").select("id,sku,name,price_inr,stock,image_url,mfg_year,brand:brands(name)").eq("is_active", true).order("created_at", { ascending: false }).limit(8);
+        const fb = await supabase
+          .from("products")
+          .select(`
+            id,
+            sku,
+            name,
+            price_inr,
+            stock,
+            image_url,
+            mfg_year,
+            brand:brands(name)
+          `)
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .limit(8);
+
         feat = fb.data || [];
       }
+
       setFeatured(feat);
     })();
   }, []);
@@ -84,8 +121,8 @@ const Index = () => {
           ],
         }}
       />
-      {/* Hero */}
 
+      {/* Hero */}
       <section className="relative pt-24 lg:pt-28">
         <div className="absolute inset-0">
           <img src={hero} alt="Auto workshop" className="w-full h-full object-cover" width={1920} height={1080} />
@@ -116,7 +153,7 @@ const Index = () => {
 
       <div className="h-12 md:h-28" />
 
-      {/* Trust strip */}
+      {/* Trust strip
       <section className="bg-background border-y border-border">
         <div className="container mx-auto grid grid-cols-2 md:grid-cols-4 divide-x divide-border">
           {[
@@ -133,6 +170,37 @@ const Index = () => {
               </div>
             </div>
           ))}
+        </div>
+      </section> */}
+
+      {/* Brands marquee */}
+      <section className="py-16 bg-gradient-to-b from-background to-muted/30 border-y border-border overflow-hidden">
+        <div className="container mx-auto">
+          <p className="text-center text-xs uppercase tracking-[0.3em] text-muted-foreground mb-2">Trusted Brands We Stock</p>
+          <h3 className="text-center font-display text-2xl md:text-3xl uppercase font-bold tracking-tight mb-10">Genuine Spares for Every Leading Marque</h3>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+            <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+            <div className="flex gap-4 animate-[marquee_40s_linear_infinite] w-max">
+              {[... brands, ...brands].map((brand, i) => (
+                <div
+                  key={`${brand.id}-${i}`}
+                  className="group flex flex-col items-center justify-center gap-2 h-32 w-40 shrink-0 bg-card border border-border rounded-lg px-4 shadow-sm hover:shadow-lg hover:border-signal/40 hover:-translate-y-1 transition-all duration-300"
+                >
+                  <img
+                    src={brand.logo_url || "/placeholder-brand.png"}
+                    alt={brand.name}
+                    loading="lazy"
+                    className="h-14 w-auto max-w-[120px] object-contain grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300"
+                  />
+
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground group-hover:text-charcoal font-semibold transition-colors">
+                    {brand.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -212,35 +280,6 @@ const Index = () => {
           ))}
         </div>
       </section>
-
-      {/* Brands marquee */}
-      <section className="py-16 bg-gradient-to-b from-background to-muted/30 border-y border-border overflow-hidden">
-        <div className="container mx-auto">
-          <p className="text-center text-xs uppercase tracking-[0.3em] text-muted-foreground mb-2">Trusted Brands We Stock</p>
-          <h3 className="text-center font-display text-2xl md:text-3xl uppercase font-bold tracking-tight mb-10">Genuine Spares for Every Leading Marque</h3>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-            <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
-            <div className="flex gap-4 animate-[marquee_40s_linear_infinite] w-max">
-              {[...BRAND_LOGOS, ...BRAND_LOGOS].map((b, i) => (
-                <div
-                  key={`${b.name}-${i}`}
-                  className="group flex flex-col items-center justify-center gap-2 h-32 w-40 shrink-0 bg-card border border-border rounded-lg px-4 shadow-sm hover:shadow-lg hover:border-signal/40 hover:-translate-y-1 transition-all duration-300"
-                >
-                  <img
-                    src={b.logo}
-                    alt={`${b.name} logo`}
-                    loading="lazy"
-                    className="h-14 w-auto max-w-[120px] object-contain grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300"
-                  />
-                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground group-hover:text-charcoal font-semibold transition-colors">{b.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
 
       {/* How it works */}
       <section className="py-20">

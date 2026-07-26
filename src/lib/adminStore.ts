@@ -1,5 +1,5 @@
-export const ADMIN_EMAIL = "supportthestoic@gmail.com";
-export const ADMIN_PASSWORD = "supportthestoic@706511";
+export const ADMIN_EMAIL = "admin@gmail.com";
+export const ADMIN_PASSWORD = "admin12345";
 const SESSION_KEY = "tsa_admin_session";
 const BLOG_KEY = "tsa_blog_posts";
 const GALLERY_KEY = "tsa_gallery_images";
