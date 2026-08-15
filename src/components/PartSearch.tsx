@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,9 +20,6 @@ type TabKey = (typeof TABS)[number]["key"];
 
 const PartSearch = ({ initialTab = "brand" as TabKey }) => {
   const [tab, setTab] = useState<TabKey>(initialTab);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [models, setModels] = useState<Model[]>([]);
-  const [cats, setCats] = useState<Category[]>([]);
 
   const [brand, setBrand] = useState<string>("");
   const [model, setModel] = useState<string>("");
@@ -31,18 +29,49 @@ const PartSearch = ({ initialTab = "brand" as TabKey }) => {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    (async () => {
-      const [b, m, c] = await Promise.all([
-        supabase.from("brands").select("id,name").order("name"),
-        supabase.from("vehicle_models").select("id,name,brand_id,vehicle_type,years"),
-        supabase.from("part_categories").select("id,name,slug").order("name"),
-      ]);
-      setBrands(b.data || []);
-      setModels(m.data || []);
-      setCats(c.data || []);
-    })();
-  }, []);
+  const { data: brands = [] } = useQuery<Brand[]>({
+    queryKey: ["brands"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("brands").select("id,name,slug,logo_url").order("name");
+      if (error) {
+        console.error("[Supabase Error - Brands]:", error);
+        throw error;
+      }
+      console.log("🏷️ [Supabase - Brands Fetched] Count:", data?.length, data);
+      if (data && data.length > 0) console.table(data);
+      return (data || []) as Brand[];
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const { data: models = [] } = useQuery<Model[]>({
+    queryKey: ["vehicle_models"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("vehicle_models").select("id,name,brand_id,vehicle_type,years");
+      if (error) {
+        console.error("[Supabase Error - Vehicle Models]:", error);
+        throw error;
+      }
+      console.log("🚗 [Supabase - Vehicle Models Fetched]:", data);
+      return (data || []) as Model[];
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const { data: cats = [] } = useQuery<Category[]>({
+    queryKey: ["part_categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("part_categories").select("id,name,slug,icon,image_url").order("name");
+      if (error) {
+        console.error("[Supabase Error - Categories]:", error);
+        throw error;
+      }
+      console.log("📦 [Supabase - Categories Fetched] Count:", data?.length, data);
+      if (data && data.length > 0) console.table(data);
+      return (data || []) as Category[];
+    },
+    staleTime: 1000 * 60 * 10,
+  });
 
   const filteredModels = useMemo(
     () => models.filter((mm) => (!brand || mm.brand_id === brand) && (!vtype || mm.vehicle_type === vtype)),
@@ -70,9 +99,8 @@ const PartSearch = ({ initialTab = "brand" as TabKey }) => {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex-1 min-w-[50%] sm:min-w-0 py-3 px-2 text-xs sm:text-sm font-semibold uppercase tracking-wider transition-colors ${
-              tab === t.key ? "bg-charcoal text-primary-foreground" : "bg-secondary text-charcoal hover:bg-muted"
-            }`}
+            className={`flex-1 min-w-[50%] sm:min-w-0 py-3 px-2 text-xs sm:text-sm font-semibold uppercase tracking-wider transition-colors ${tab === t.key ? "bg-charcoal text-primary-foreground" : "bg-secondary text-charcoal hover:bg-muted"
+              }`}
           >
             {t.label}
           </button>

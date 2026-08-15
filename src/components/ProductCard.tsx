@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
-import { ShoppingCart, Zap } from "lucide-react";
+import { ShoppingCart, Zap, ImageOff } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export type ProductCardData = {
   id: string;
@@ -19,7 +21,15 @@ const ProductCard = ({ p }: { p: ProductCardData }) => {
   const { add } = useCart();
   const navigate = useNavigate();
   const inStock = p.stock > 0;
-  const addItem = () => add({ id: p.id, name: p.name, price_inr: Number(p.price_inr), image_url: p.image_url });
+
+  const hasValidUrl = Boolean(
+    p.image_url &&
+    !p.image_url.startsWith("/__l5e") &&
+    (p.image_url.startsWith("http://") || p.image_url.startsWith("https://") || p.image_url.startsWith("data:") || p.image_url.startsWith("/assets/"))
+  );
+
+  const [imgFailed, setImgFailed] = useState(!hasValidUrl);
+  const addItem = () => add({ id: p.id, name: p.name, price_inr: Number(p.price_inr), image_url: !imgFailed ? p.image_url : null });
 
   return (
     <div className="group bg-white border border-border rounded-xl overflow-hidden flex flex-col shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
@@ -34,17 +44,22 @@ const ProductCard = ({ p }: { p: ProductCardData }) => {
             Out of stock
           </span>
         )}
-        <div className="aspect-square bg-gradient-to-br from-secondary/40 to-white flex items-center justify-center p-6">
-          {p.image_url ? (
+        <div className="aspect-square bg-gradient-to-br from-secondary/40 to-white flex items-center justify-center p-6 overflow-hidden">
+          {!imgFailed && p.image_url ? (
             <img
               src={p.image_url}
               alt={p.name}
-              className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+              onError={() => setImgFailed(true)}
+              className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500 rounded-md"
               loading="lazy"
             />
           ) : (
-            <div className="text-steel font-display text-4xl font-bold tracking-tight">
-              {p.sku.split("-")[1] || p.sku}
+            <div className="w-full h-full relative rounded-md overflow-hidden flex items-center justify-center">
+              <Skeleton className="w-full h-full absolute inset-0" />
+              <div className="relative z-10 flex flex-col items-center justify-center text-muted-foreground/50 gap-1.5">
+                <ImageOff size={24} className="stroke-[1.5]" />
+                <span className="text-[10px] font-mono uppercase tracking-widest">{p.sku.split("-")[1] || p.sku}</span>
+              </div>
             </div>
           )}
         </div>

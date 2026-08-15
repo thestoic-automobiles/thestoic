@@ -4,6 +4,7 @@ import SEO from "@/components/SEO";
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
 import { Trash2, ShoppingBag } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Cart = () => {
   const { items, setQty, remove, subtotal, count } = useCart();
@@ -23,9 +24,17 @@ const Cart = () => {
         ) : (
           <div className="grid lg:grid-cols-[1fr_360px] gap-8">
             <div className="border border-border rounded-md divide-y divide-border">
-              {items.map((i) => (
-                <div key={i.id} className="p-4 flex gap-4 items-center">
-                  <div className="h-20 w-20 bg-secondary rounded-sm shrink-0 flex items-center justify-center text-steel font-display text-xs">{i.image_url ? <img src={i.image_url} alt={i.name} className="w-full h-full object-cover rounded-sm" /> : "PART"}</div>
+              {items.map((i) => {
+                const hasValid = Boolean(i.image_url && !i.image_url.startsWith("/__l5e"));
+                return (
+                  <div key={i.id} className="p-4 flex gap-4 items-center">
+                    <div className="h-20 w-20 bg-secondary rounded-sm shrink-0 flex items-center justify-center overflow-hidden relative">
+                      {hasValid && i.image_url ? (
+                        <img src={i.image_url} alt={i.name} className="w-full h-full object-cover rounded-sm" />
+                      ) : (
+                        <Skeleton className="w-full h-full" />
+                      )}
+                    </div>
                   <div className="flex-1 min-w-0">
                     <Link to={`/product/${i.id}`} className="font-display font-semibold hover:text-signal line-clamp-1">{i.name}</Link>
                     <p className="text-sm text-muted-foreground">₹{Number(i.price_inr).toLocaleString("en-IN")}</p>
@@ -38,8 +47,9 @@ const Cart = () => {
                   <p className="font-semibold w-24 text-right">₹{(i.qty * Number(i.price_inr)).toLocaleString("en-IN")}</p>
                   <button onClick={() => remove(i.id)} className="text-muted-foreground hover:text-destructive p-2" aria-label="Remove"><Trash2 size={16} /></button>
                 </div>
-              ))}
-            </div>
+              );
+            })}
+          </div>
 
             <aside className="border border-border rounded-md p-6 h-fit bg-card">
               <h2 className="font-display text-lg font-bold uppercase mb-4">Order Summary</h2>

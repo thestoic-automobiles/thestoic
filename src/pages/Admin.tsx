@@ -20,6 +20,7 @@ import Dashboard from "@/components/admin/Dashboard";
 import CategoriesManager from "@/components/admin/CategoriesManager";
 import BrandsManager from "@/components/admin/BrandsManager";
 import VehicleModelsManager from "@/components/admin/VehicleModelsManager";
+import BillManager from "@/components/admin/BillManager";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -83,6 +84,7 @@ const Admin = () => {
             <TabsTrigger value="categories">Categories</TabsTrigger>
             <TabsTrigger value="brands">Brands</TabsTrigger>
             <TabsTrigger value="models">Vehicle Models</TabsTrigger>
+            <TabsTrigger value="billing">Generate Bill</TabsTrigger>
             <TabsTrigger value="blog">Blog</TabsTrigger>
             <TabsTrigger value="gallery">Gallery</TabsTrigger>
           </TabsList>
@@ -93,8 +95,7 @@ const Admin = () => {
           <TabsContent value="categories" className="mt-6"><CategoriesManager /></TabsContent>
           <TabsContent value="brands" className="mt-6"><BrandsManager /></TabsContent>
           <TabsContent value="models" className="mt-6"><VehicleModelsManager /></TabsContent>
-
-
+          <TabsContent value="billing" className="mt-6"><BillManager /></TabsContent>
 
           <TabsContent value="blog" className="space-y-8 mt-6">
             <form onSubmit={addPost} className="space-y-4 p-6 border rounded-lg">

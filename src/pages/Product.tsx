@@ -6,7 +6,8 @@ import SEO, { SITE_URL } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
-import { ChevronRight, ShoppingCart, BadgeCheck, Truck, Zap } from "lucide-react";
+import { ChevronRight, ShoppingCart, BadgeCheck, Truck, Zap, ImageOff } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type P = {
   id: string; sku: string; name: string; description: string | null; price_inr: number;
@@ -19,6 +20,7 @@ const Product = () => {
   const navigate = useNavigate();
   const [p, setP] = useState<P | null>(null);
   const [qty, setQty] = useState(1);
+  const [imgFailed, setImgFailed] = useState(false);
   const { add } = useCart();
 
   useEffect(() => {
@@ -29,6 +31,12 @@ const Product = () => {
         .select("id,sku,name,description,price_inr,stock,image_url,mfg_year,brand:brands(name),category:part_categories(name)")
         .eq("id", id).maybeSingle();
       setP(data as any);
+      const hasValid = Boolean(
+        data?.image_url &&
+        !data.image_url.startsWith("/__l5e") &&
+        (data.image_url.startsWith("http://") || data.image_url.startsWith("https://") || data.image_url.startsWith("data:") || data.image_url.startsWith("/assets/"))
+      );
+      setImgFailed(!hasValid);
     })();
   }, [id]);
 
@@ -40,7 +48,7 @@ const Product = () => {
         title={`${p.name}${p.brand?.name ? ` — ${p.brand.name}` : ""}`}
         description={(p.description || `Buy genuine ${p.name}${p.brand?.name ? ` by ${p.brand.name}` : ""}. SKU ${p.sku}. In stock, GST invoice, pan-India dispatch.`).slice(0, 160)}
         path={`/product/${p.id}`}
-        image={p.image_url || undefined}
+        image={!imgFailed && p.image_url ? p.image_url : undefined}
         type="product"
         jsonLd={[
           {
@@ -49,7 +57,7 @@ const Product = () => {
             name: p.name,
             sku: p.sku,
             description: p.description || `${p.name} — genuine spare part.`,
-            image: p.image_url || undefined,
+            image: !imgFailed && p.image_url ? p.image_url : undefined,
             brand: p.brand?.name ? { "@type": "Brand", name: p.brand.name } : undefined,
             category: p.category?.name,
             offers: {
@@ -79,11 +87,23 @@ const Product = () => {
         </nav>
 
         <div className="grid lg:grid-cols-2 gap-10">
-          <div className="aspect-square bg-secondary border border-border rounded-md flex items-center justify-center">
-            {p.image_url ? (
-              <img src={p.image_url} alt={p.name} loading="lazy" className="w-full h-full object-cover rounded-md" />
+          <div className="aspect-square bg-white border border-border rounded-xl flex items-center justify-center p-8 overflow-hidden shadow-sm">
+            {!imgFailed && p.image_url ? (
+              <img
+                src={p.image_url}
+                alt={p.name}
+                onError={() => setImgFailed(true)}
+                loading="lazy"
+                className="w-full h-full object-contain rounded-md"
+              />
             ) : (
-              <span className="font-display text-7xl text-steel font-bold">{p.sku}</span>
+              <div className="w-full h-full relative rounded-md overflow-hidden flex items-center justify-center">
+                <Skeleton className="w-full h-full absolute inset-0" />
+                <div className="relative z-10 flex flex-col items-center justify-center text-muted-foreground/50 gap-2">
+                  <ImageOff size={36} className="stroke-[1.5]" />
+                  <span className="text-xs font-mono uppercase tracking-widest">{p.sku}</span>
+                </div>
+              </div>
             )}
           </div>
 
