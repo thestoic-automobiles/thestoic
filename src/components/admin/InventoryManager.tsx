@@ -10,8 +10,10 @@ import {
   Plus,
   Save,
   Upload,
+  FileSpreadsheet,
 } from "lucide-react";
 import { fileToDataUrl } from "@/lib/adminStore";
+import Papa from "papaparse";
 
 type Product = {
   id: string;
@@ -392,12 +394,12 @@ const InventoryManager = () => {
     const newBrandList =
       form.brand_list.includes(brandId)
         ? form.brand_list.filter(
-            (id) => id !== brandId
-          )
+          (id) => id !== brandId
+        )
         : [
-            ...form.brand_list,
-            brandId,
-          ];
+          ...form.brand_list,
+          brandId,
+        ];
 
     setForm((prev) => ({
       ...prev,
@@ -427,13 +429,13 @@ const InventoryManager = () => {
         compatible_model_ids:
           exists
             ? prev.compatible_model_ids.filter(
-                (id) =>
-                  id !== modelId
-              )
+              (id) =>
+                id !== modelId
+            )
             : [
-                ...prev.compatible_model_ids,
-                modelId,
-              ],
+              ...prev.compatible_model_ids,
+              modelId,
+            ],
       };
     });
   };
@@ -450,12 +452,12 @@ const InventoryManager = () => {
     const newBrandList =
       currentBrands.includes(brandId)
         ? currentBrands.filter(
-            (id) => id !== brandId
-          )
+          (id) => id !== brandId
+        )
         : [
-            ...currentBrands,
-            brandId,
-          ];
+          ...currentBrands,
+          brandId,
+        ];
 
     // Models that belong to currently
     // selected brands
@@ -535,12 +537,12 @@ const InventoryManager = () => {
     const newModelIds =
       currentModelIds.includes(modelId)
         ? currentModelIds.filter(
-            (id) => id !== modelId
-          )
+          (id) => id !== modelId
+        )
         : [
-            ...currentModelIds,
-            modelId,
-          ];
+          ...currentModelIds,
+          modelId,
+        ];
 
     updateField(
       productId,
@@ -704,7 +706,7 @@ const InventoryManager = () => {
     // Require compatible model
     if (
       "compatible_model_ids" in
-        patch &&
+      patch &&
       Array.isArray(
         patch.compatible_model_ids
       ) &&
@@ -777,6 +779,258 @@ const InventoryManager = () => {
     toast.success("Deleted");
 
     load();
+  };
+
+  // =========================================================
+  // CSV IMPORT HELPERS
+  // =========================================================
+
+  const parseArrayField = (value: unknown): string[] => {
+    if (value === null || value === undefined) return [];
+
+    const str = String(value).trim();
+    if (!str) return [];
+
+    // PostgreSQL array format: {uuid1,uuid2}
+    if (str.startsWith("{") && str.endsWith("}")) {
+      const content = str.slice(1, -1).trim();
+      if (!content) return [];
+
+      return content
+        .split(",")
+        .map((item) => item.trim().replace(/^"|"$/g, ""))
+        .filter(Boolean);
+    }
+
+    // JSON array format: ["uuid1","uuid2"]
+    if (str.startsWith("[") && str.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(str);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((item) => String(item).trim())
+            .filter(Boolean);
+        }
+      } catch {
+        // Fall through to single-value handling.
+      }
+    }
+
+    return [str];
+  };
+
+  const parseBoolean = (
+    value: unknown,
+    defaultValue = false
+  ): boolean => {
+    if (value === null || value === undefined) {
+      return defaultValue;
+    }
+
+    const str = String(value).trim().toLowerCase();
+
+    if (["true", "1", "yes", "y"].includes(str)) return true;
+    if (["false", "0", "no", "n"].includes(str)) return false;
+
+    return defaultValue;
+  };
+
+  const parseNumber = (
+    value: unknown,
+    defaultValue: number | null = null
+  ): number | null => {
+    if (
+      value === null ||
+      value === undefined ||
+      String(value).trim() === ""
+    ) {
+      return defaultValue;
+    }
+
+    const number = Number(value);
+    return Number.isFinite(number) ? number : defaultValue;
+  };
+
+  // =========================================================
+  // IMPORT PRODUCTS FROM CSV
+  // =========================================================
+
+  const handleCSVImport = async (file: File | undefined) => {
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      toast.error("Please select a CSV file");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const text = await file.text();
+
+      const result = Papa.parse<Record<string, string>>(text, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header) => header.trim(),
+      });
+
+      if (result.errors.length > 0) {
+        console.error("CSV parsing errors:", result.errors);
+        toast.error(`CSV parsing failed: ${result.errors[0].message}`);
+        return;
+      }
+
+      const rows = result.data;
+
+      if (rows.length === 0) {
+        toast.error("CSV file contains no products");
+        return;
+      }
+
+      // Required fields for the current products table.
+      const requiredColumns = ["sku", "name"];
+      const csvColumns = Object.keys(rows[0] || {});
+
+      const missingColumns = requiredColumns.filter(
+        (column) => !csvColumns.includes(column)
+      );
+
+      if (missingColumns.length > 0) {
+        toast.error(
+          `Missing required columns: ${missingColumns.join(", ")}`
+        );
+        return;
+      }
+
+      const productsToInsert: Array<Record<string, unknown>> = [];
+      const validationErrors: string[] = [];
+
+      rows.forEach((row, index) => {
+        const rowNumber = index + 2;
+        const sku = String(row.sku || "").trim();
+        const name = String(row.name || "").trim();
+
+        if (!sku) {
+          validationErrors.push(`Row ${rowNumber}: SKU is missing`);
+          return;
+        }
+
+        if (!name) {
+          validationErrors.push(`Row ${rowNumber}: Name is missing`);
+          return;
+        }
+
+        const brandList = parseArrayField(row.brand_list);
+        const compatibleModelIds = parseArrayField(row.compatible_model_ids);
+
+        if (brandList.length === 0) {
+          validationErrors.push(`Row ${rowNumber}: brand_list is empty`);
+          return;
+        }
+
+        if (compatibleModelIds.length === 0) {
+          validationErrors.push(
+            `Row ${rowNumber}: compatible_model_ids is empty`
+          );
+          return;
+        }
+
+        productsToInsert.push({
+          sku,
+          name,
+          description: String(row.description || "").trim() || null,
+          price_inr: parseNumber(row.price_inr, 0),
+          stock: parseNumber(row.stock, 0),
+          image_url: String(row.image_url || "").trim() || null,
+          category_id: String(row.category_id || "").trim() || null,
+          brand_list: brandList,
+          compatible_model_ids: compatibleModelIds,
+          manufacturer: String(row.manufacturer || "").trim() || null,
+          is_active: parseBoolean(row.is_active, true),
+          is_featured: parseBoolean(row.is_featured, false),
+          mrp_inr: parseNumber(row.mrp_inr, null),
+          discount_pct: parseNumber(row.discount_pct, 0),
+        });
+
+        // mfg_year is accepted in the CSV but is intentionally ignored here
+        // because the current Product type/payload does not contain mfg_year.
+      });
+
+      if (validationErrors.length > 0) {
+        console.error("CSV validation errors:", validationErrors);
+
+        const preview = validationErrors.slice(0, 5).join(" | ");
+        const extra =
+          validationErrors.length > 5
+            ? ` (+${validationErrors.length - 5} more)`
+            : "";
+
+        toast.error(`CSV validation failed: ${preview}${extra}`);
+        return;
+      }
+
+      if (productsToInsert.length === 0) {
+        toast.error("No valid products found in CSV");
+        return;
+      }
+
+      // Prevent duplicate SKU values inside the same CSV.
+      const skus = productsToInsert.map((product) => String(product.sku));
+      const duplicateInCSV = skus.filter(
+        (sku, index) => skus.indexOf(sku) !== index
+      );
+
+      if (duplicateInCSV.length > 0) {
+        const uniqueDuplicates = [...new Set(duplicateInCSV)];
+        toast.error(
+          `Duplicate SKU(s) in CSV: ${uniqueDuplicates.join(", ")}`
+        );
+        return;
+      }
+
+      // Prevent importing a SKU that already exists.
+      const { data: existingProducts, error: existingError } =
+        await supabase
+          .from("products")
+          .select("sku")
+          .in("sku", skus);
+
+      if (existingError) {
+        console.error("Existing SKU check error:", existingError);
+        toast.error(existingError.message);
+        return;
+      }
+
+      if (existingProducts && existingProducts.length > 0) {
+        const existingSkus = existingProducts.map((product) => product.sku);
+        toast.error(
+          `SKU already exists: ${existingSkus.join(", ")}. Remove it from CSV or use a new SKU.`
+        );
+        return;
+      }
+
+      // Insert all rows in one Supabase request.
+      const { error: insertError } = await supabase
+        .from("products")
+        .insert(productsToInsert);
+
+      if (insertError) {
+        console.error("CSV product import error:", insertError);
+        toast.error(`Import failed: ${insertError.message}`);
+        return;
+      }
+
+      toast.success(
+        `${productsToInsert.length} product(s) imported successfully`
+      );
+
+      await load();
+    } catch (error) {
+      console.error("CSV import error:", error);
+      toast.error("Failed to import CSV file");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // =========================================================
@@ -1021,7 +1275,7 @@ const InventoryManager = () => {
             <div className="border rounded-md bg-background p-2 max-h-40 overflow-y-auto">
 
               {brands.length ===
-              0 ? (
+                0 ? (
                 <p className="text-sm text-muted-foreground p-1">
                   No brands available
                 </p>
@@ -1067,19 +1321,19 @@ const InventoryManager = () => {
 
             {form.brand_list.length >
               0 && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {
-                  form.brand_list
-                    .length
-                }{" "}
-                brand
-                {form.brand_list
-                  .length !== 1
-                  ? "s"
-                  : ""}{" "}
-                selected
-              </p>
-            )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  {
+                    form.brand_list
+                      .length
+                  }{" "}
+                  brand
+                  {form.brand_list
+                    .length !== 1
+                    ? "s"
+                    : ""}{" "}
+                  selected
+                </p>
+              )}
 
           </div>
 
@@ -1098,7 +1352,7 @@ const InventoryManager = () => {
             <div className="border rounded-md bg-background p-2 max-h-40 overflow-y-auto">
 
               {form.brand_list.length ===
-              0 ? (
+                0 ? (
                 <p className="text-sm text-muted-foreground p-1">
                   Select a brand first
                 </p>
@@ -1151,21 +1405,21 @@ const InventoryManager = () => {
 
             {form.compatible_model_ids
               .length > 0 && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {
-                  form
+                <p className="text-xs text-muted-foreground mt-1">
+                  {
+                    form
+                      .compatible_model_ids
+                      .length
+                  }{" "}
+                  model
+                  {form
                     .compatible_model_ids
-                    .length
-                }{" "}
-                model
-                {form
-                  .compatible_model_ids
-                  .length !== 1
-                  ? "s"
-                  : ""}{" "}
-                selected
-              </p>
-            )}
+                    .length !== 1
+                    ? "s"
+                    : ""}{" "}
+                  selected
+                </p>
+              )}
 
           </div>
 
@@ -1309,24 +1563,39 @@ const InventoryManager = () => {
 
       <div className="space-y-3">
 
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
 
           <h3 className="font-display text-lg font-semibold uppercase">
-            Inventory (
-            {filtered.length}
-            )
+            Inventory ({filtered.length})
           </h3>
 
-          <Input
-            placeholder="Search by name or SKU"
-            value={search}
-            onChange={(e) =>
-              setSearch(
-                e.target.value
-              )
-            }
-            className="max-w-xs"
-          />
+          <div className="flex items-center gap-2">
+
+            {/* CSV IMPORT */}
+            <label className="inline-flex items-center gap-2 px-3 h-10 border rounded-md cursor-pointer hover:bg-secondary">
+              <FileSpreadsheet size={26} />
+              Import CSV
+
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => {
+                  handleCSVImport(e.target.files?.[0]);
+                  e.currentTarget.value = "";
+                }}
+              />
+            </label>
+
+            {/* SEARCH */}
+            <Input
+              placeholder="Search by name or SKU"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-xs"
+            />
+
+          </div>
 
         </div>
 
@@ -1541,7 +1810,7 @@ const InventoryManager = () => {
                       <div className="border rounded-md bg-background p-2 max-h-32 overflow-y-auto min-w-[200px]">
 
                         {brands.length ===
-                        0 ? (
+                          0 ? (
                           <p className="text-xs text-muted-foreground">
                             No brands
                           </p>
@@ -1612,7 +1881,7 @@ const InventoryManager = () => {
                       <div className="border rounded-md bg-background p-2 max-h-32 overflow-y-auto min-w-[240px]">
 
                         {rowBrandIds.length ===
-                        0 ? (
+                          0 ? (
                           <p className="text-xs text-muted-foreground">
                             Select brand first
                           </p>
@@ -1672,32 +1941,32 @@ const InventoryManager = () => {
                       {/* SELECTED MODEL NAMES */}
                       {rowModelIds.length >
                         0 && (
-                        <div className="mt-1">
+                          <div className="mt-1">
 
-                          <p className="text-[11px] text-muted-foreground">
-                            {
-                              rowModelIds.length
-                            }{" "}
-                            selected
-                          </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {
+                                rowModelIds.length
+                              }{" "}
+                              selected
+                            </p>
 
-                          <p className="text-[11px] leading-4">
-                            {rowModelIds
-                              .map(
-                                (
-                                  modelId
-                                ) =>
-                                  getModelName(
+                            <p className="text-[11px] leading-4">
+                              {rowModelIds
+                                .map(
+                                  (
                                     modelId
-                                  )
-                              )
-                              .join(
-                                ", "
-                              )}
-                          </p>
+                                  ) =>
+                                    getModelName(
+                                      modelId
+                                    )
+                                )
+                                .join(
+                                  ", "
+                                )}
+                            </p>
 
-                        </div>
-                      )}
+                          </div>
+                        )}
 
                     </td>
 
@@ -1723,7 +1992,7 @@ const InventoryManager = () => {
                               ""
                               ? null
                               : +e.target
-                                  .value
+                                .value
                           )
                         }
                         className="h-8 w-24"
